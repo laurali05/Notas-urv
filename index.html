@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Notas GEB — URV 2026/27</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-soft: #eef2ff;
+      --green: #10b981;
+      --green-soft: #ecfdf5;
+      --red: #ef4444;
+      --red-soft: #fef2f2;
+      --amber: #f59e0b;
+      --amber-soft: #fffbeb;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px 16px 60px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      background: var(--card);
+      padding: 20px 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+    }
+
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    header p {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .sync-status {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .summary-pills {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: var(--bg);
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+
+    .pill strong {
+      display: block;
+      font-size: 1.1rem;
+      color: var(--primary);
+    }
+
+    .pill.pill-danger strong { color: var(--red); }
+    .pill.pill-success strong { color: var(--green); }
+
+    .actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.83rem;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+    }
+
+    .btn-outline {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .btn-danger:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(490px, 1fr));
+      gap: 20px;
+    }
+
+    @media (max-width: 540px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s ease;
+    }
+
+    .card.card-second-conv { border-color: #fca5a5; }
+    .card.card-passed { border-color: #6ee7b7; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title { font-size: 1.05rem; font-weight: 700; }
+    .card-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+    .badge {
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-pass { background: var(--green-soft); color: var(--green); }
+    .badge-fail { background: var(--red-soft); color: var(--red); }
+    .badge-pending { background: var(--amber-soft); color: var(--amber); }
+
+    .items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .item-row {
+      display: grid;
+      grid-template-columns: 1fr auto 78px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border-radius: 9px;
+      border: 1px solid transparent;
+    }
+
+    .item-row.error-min {
+      border-color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .item-name { font-size: 0.88rem; font-weight: 500; }
+    .item-sub { font-size: 0.75rem; color: var(--muted); }
+
+    .weight-tag {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-align: center;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .card-footer {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .grade-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+
+    .final-score { font-size: 1.25rem; font-weight: 800; }
+
+    .conv-banner {
+      padding: 8px 11px;
+      border-radius: 8px;
+      font-size: 0.81rem;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .conv-banner.viable { background: var(--primary-soft); color: var(--primary); }
+    .conv-banner.passed { background: var(--green-soft); color: #065f46; }
+    .conv-banner.second { background: var(--red-soft); color: #991b1b; }
+
+    .helper-text {
+      font-size: 0.81rem;
+      color: var(--text);
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Control de Evaluación — 1Q (2026/27)</h1>
+        <p>Grado en Ingeniería Biomédica · URV · Seguimiento 1ª vs 2ª Convocatoria</p>
+        <span class="sync-status" id="sync-badge">Modo local (solo este dispositivo)</span>
+      </div>
+      <div class="summary-pills">
+        <div class="pill">
+          <span>Media Ponderada ECTS</span>
+          <strong id="global-avg">—</strong>
+        </div>
+        <div class="pill pill-success">
+          <span>Aprobadas (1ª Conv.)</span>
+          <strong id="passed-count">0 / 7</strong>
+        </div>
+        <div class="pill pill-danger">
+          <span>A 2ª Convocatoria</span>
+          <strong id="second-count">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="actions-bar">
+      <div class="btn-group">
+        <button class="btn-primary" onclick="exportBackup()">📋 Copiar notas (para pasar al móvil)</button>
+        <button class="btn-outline" onclick="importBackup()">📥 Pegar notas</button>
+      </div>
+      <button class="btn-outline btn-danger" onclick="resetAll()">Borrar todas las notas</button>
+    </div>
+
+    <div class="grid" id="subjects-grid"></div>
+  </div>
+
+  <script>
+    // =========================================================
+    // OPCIONAL: Rellena estos 2 datos de tu proyecto Supabase
+    // para sincronizar automáticamente entre PC, iPad y móvil
+    // =========================================================
+    const SUPABASE_URL = "https://suuqmynpnjfdiabmjrlz.supabase.co"; 
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1dXFteW5wbmpmZGlhYm1qcmx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1MTgzMTgsImV4cCI6MjExMTA5NDMxOH0.3g9WrOWu6F-rN-p7cbYQZcgJrDgxgCkSkezX-RbpiPE";
+    const ROW_ID = "laura_2026_27";
+
+    let sbClient = null;
+    if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+
+    const SUBJECTS = [
+      {
+        id: "edi",
+        name: "Electrònica Digital (ED)",
+        ects: 6,
+        ruleNote: "Media parciales (test + mixtas) ≥ 4 y media prácticas ≥ 4. Tope 4.5 si falla mínimo.",
+        secondConvInfo: "2ª Convocatoria: Examen solo de teoría/problemas (las prácticas NO se recuperan, se guarda la nota).",
+        items: [
+          { id: "lab", name: "Pràctiques a laboratoris", weight: 10, min: 0, hint: "Media práctica (10%+20%) ≥ 4" },
+          { id: "proj", name: "Projecte Integrador (Rellotge)", weight: 20, min: 0, hint: "Media práctica (10%+20%) ≥ 4" },
+          { id: "p1", name: "Parcial 1 (Test + Mixta)", weight: 35, min: 0, hint: "Media P1+P2 debe ser ≥ 4" },
+          { id: "p2", name: "Parcial 2 (Test + Mixta)", weight: 35, min: 0, hint: "Media P1+P2 debe ser ≥ 4" }
+        ],
+        evaluate(scores) {
+          const { lab, proj, p1, p2 } = scores;
+          let currentPoints = 0;
+          let filledWeight = 0;
+
+          this.items.forEach(item => {
+            const val = scores[item.id];
+            if (val !== null) {
+              currentPoints += val * (item.weight / 100);
+              filledWeight += item.weight;
+            }
+          });
+
+          const failedItems = [];
+          const warnings = [];
+
+          if (lab !== null && proj !== null) {
+            const pracAvg = (lab * 10 + proj * 20) / 30;
+            if (pracAvg < 4) {
+              failedItems.push("lab", "proj");
+              warnings.push(`Media prácticas = ${pracAvg.toFixed(2)} (< 4.0).`);
+            }
+          } else if (lab !== null && proj === null) {
+            if ((lab * 10 + 200) / 30 < 4) {
+              failedItems.push("lab");
+              warnings.push("Imposible llegar al 4.0 de media en prácticas.");
+            }
+          } else if (lab === null && proj !== null) {
+            if ((100 + proj * 20) / 30 < 4) {
+              failedItems.push("proj");
+              warnings.push("Imposible llegar al 4.0 de media en prácticas.");
+            }
+          }
+
+          if (p1 !== null && p2 !== null) {
+            const theoryAvg = (p1 + p2) / 2;
+            if (theoryAvg < 4) {
+              failedItems.push("p1", "p2");
+              warnings.push(`Media parciales = ${theoryAvg.toFixed(2)} (< 4.0).`);
+            }
+          }
+
+          const remainingWeight = 100 - filledWeight;
+          const maxPossible = currentPoints + (remainingWeight / 100) * 10;
+
+          if (warnings.length > 0 || maxPossible < 5) {
+            const reason = warnings.length > 0
+              ? `${warnings.join(" ")} Tope en acta: 4.50.`
+              : `Nota máxima alcanzable: ${maxPossible.toFixed(2)} (< 5.0).`;
+            return {
+              finalGrade: warnings.length > 0 ? Math.min(currentPoints, 4.5) : currentPoints,
+              status: "fail",
+              badge: "2ª Convocatoria",
+              convType: "second",
+              convBanner: `⚠️ Hay que ir a 2ª convocatoria. ${reason}`,
+              message: this.secondConvInfo,
+              failedItems
+            };
+          }
+
+          if (filledWeight < 100) {
+            const neededPoints = 5 - currentPoints;
+            let targets = [];
+            if (neededPoints <= 0) {
+              targets.push("Ya tienes los 5.00 pts globales");
+            } else {
+              const neededAvg = (neededPoints / remainingWeight) * 100;
+              targets.push(`sacar una media de ${neededAvg.toFixed(2)} en el ${remainingWeight}% restante`);
+            }
+            if (p1 !== null && p2 === null) {
+              const minP2 = Math.max(0, 8 - p1);
+              targets.push(`mínimo ${minP2.toFixed(2)} en Parcial 2`);
+            }
+            if (lab !== null && proj === null) {
+              const minProj = Math.max(0, (120 - lab * 10) / 20);
+              targets.push(`mínimo ${minProj.toFixed(2)} en Projecte`);
+            }
+            if (lab === null && proj !== null) {
+              const minLab = Math.max(0, (120 - proj * 20) / 10);
+              targets.push(`mínimo ${minLab.toFixed(2)} en Pràctiques`);
+            }
+            return {
+              finalGrade: currentPoints,
+              status: "pending",
+              badge: "1ª Conv. viable",
+              convType: "viable",
+              convBanner: "✅ Todavía se puede aprobar en 1ª convocatoria.",
+              message: `Para aprobar necesitas: ${targets.join(" · ")}.`,
+              failedItems: []
+            };
+          }
+
+          return {
+            finalGrade: currentPoints,
+            status: "pass",
+            badge: "Aprobada (1ª Conv.)",
+            convType: "passed",
+            convBanner: "🎉 ¡Asignatura aprobada en 1ª convocatoria!",
+            message: currentPoints >= 9 ? "Nota de Excelente (candidata a Matrícula de Honor)." : "Todos los mínimos y la media superados.",
+            failedItems: []
+          };
+        }
+      },
+      {
+        id: "fci",
+        name: "Fonaments de Comunicacions I",
+        ects: 6,
+        ruleNote: "Mínimo 3.5 en cada parcial para hacer media. Media ≥ 5.",
+        secondConvInfo: "2ª Convocatoria: Examen escrito único de todo el temario de la asignatura.",
+        items: [
+          { id: "p1", name: "Parcial 1 (Teoría + Problemas)", weight: 50, min: 3.5, hint: "Mín. 3.5 para hacer media" },
+          { id: "p2", name: "Parcial 2 (Teoría + Problemas)", weight: 50, min: 3.5, hint: "Mín. 3.5 para hacer media" }
+        ],
+        evaluate(scores) {
+          return standardEval(this, scores, { capIfMinFailed: 4.5 });
+        }
+      },
+      {
+        id: "fma",
+        name: "Física Mèdica Avançada",
+        ects: 3,
+        ruleNote: "Mínimo 5 en la Prova Final (70%) para sumar seminaris.",
+        secondConvInfo: "2ª Convocatoria: Examen final (70%) donde también debes sacar ≥ 5 para que sumen los seminaris.",
+        items: [
+          { id: "sem", name: "Seminaris (Cuestionarios Moodle)", weight: 30, min: 0, hint: "Sin mínimo" },
+          { id: "fin", name: "Prova mixta final", weight: 70, min: 5, hint: "Mín. 5 obligatorio" }
+        ],
+        evaluate(scores) {
+          const sSem = scores.sem;
+          const sFin = scores.fin;
+          const hasAll = sSem !== null && sFin !== null;
+          const weighted = ((sSem || 0) * 0.3) + ((sFin || 0) * 0.7);
+
+          if (sFin !== null && sFin < 5) {
+            return {
+              finalGrade: sFin,
+              status: "fail",
+              badge: "2ª Convocatoria",
+              convType: "second",
+              convBanner: `⚠️ Hay que ir a 2ª convocatoria. Al sacar < 5 en la prueba final (${sFin.toFixed(2)}), no suman los seminaris.`,
+              message: this.secondConvInfo,
+              failedItems: ["fin"]
+            };
+          }
+
+          if (!hasAll) {
+            let msg = "";
+            if (sSem !== null && sFin === null) {
+              const needed = Math.max(5, (5 - sSem * 0.3) / 0.7);
+              msg = `Para aprobar necesitas sacar al menos un ${needed.toFixed(2)} en la Prova mixta final.`;
+            } else if (sSem === null && sFin !== null) {
+              const needed = Math.max(0, (5 - sFin * 0.7) / 0.3);
+              if (needed > 10) {
+                return {
+                  finalGrade: weighted,
+                  status: "fail",
+                  badge: "2ª Convocatoria",
+                  convType: "second",
+                  convBanner: "⚠️ Hay que ir a 2ª convocatoria. Ni con un 10 en Seminaris llegas al 5.0.",
+                  message: this.secondConvInfo,
+                  failedItems: []
+                };
+              }
+              msg = `Para aprobar necesitas sacar al menos un ${needed.toFixed(2)} en Seminaris.`;
+            } else {
+              msg = "Para aprobar necesitas: mínimo 5.00 en la Prova final y media ≥ 5.00.";
+            }
+            return {
+              finalGrade: weighted,
+              status: "pending",
+              badge: "1ª Conv. viable",
+              convType: "viable",
+              convBanner: "✅ Todavía se puede aprobar en 1ª convocatoria.",
+              message: msg,
+              failedItems: []
+            };
+          }
+
+          const passed = weighted >= 5;
+          return {
+            finalGrade: weighted,
+            status: passed ? "pass" : "fail",
+            badge: passed ? "Aprobada (1ª Conv.)" : "2ª Convocatoria",
+            convType: passed ? "passed" : "second",
+            convBanner: passed
+              ? "🎉 ¡Asignatura aprobada en 1ª convocatoria!"
+              : "⚠️ Hay que ir a 2ª convocatoria (media < 5.0).",
+            message: passed ? "¡Superada!" : this.secondConvInfo,
+            failedItems: []
+          };
+        }
+      },
+      {
+        id: "fisio",
+        name: "Fisiopatologia",
+        ects: 4.5,
+        ruleNote: "Todos los bloques ≥ 5 por separado. En el test final fallos restan 0.25.",
+        secondConvInfo: "2ª Convocatoria: Solo tendrás que recuperar las partes/competencias suspendidas en 1ª convocatoria.",
+        items: [
+          { id: "ac", name: "Proves d'avaluació continuada (3 parcials)", weight: 10, min: 5, hint: "Mín. 5" },
+          { id: "lab", name: "Pràctiques laboratori (4 seminaris)", weight: 20, min: 5, hint: "Mín. 5 + Asistencia >75%" },
+          { id: "sint_t", name: "Prova de síntesi: Teoria (50 preg.)", weight: 50, min: 5, hint: "Mín. 5" },
+          { id: "sint_p", name: "Prova de síntesi: Pràctica (20 preg.)", weight: 20, min: 5, hint: "Mín. 5" }
+        ],
+        evaluate(scores) {
+          return standardEval(this, scores, { capIfMinFailed: null });
+        }
+      },
+      {
+        id: "omiques",
+        name: "Tecnologies Òmiques i Tract. Dades",
+        ects: 4.5,
+        ruleNote: "Media ponderada directa entre todos los ítems (sin notas mínimas).",
+        secondConvInfo: "2ª Convocatoria: Examen único tipo test global de teoría y prácticas.",
+        items: [
+          { id: "lab", name: "Pràctiques a laboratoris", weight: 10, min: 0, hint: "Asistencia obligatoria" },
+          { id: "proj", name: "Projecte individual de laboratori", weight: 40, min: 0, hint: "Entrega última sesión" },
+          { id: "pres", name: "Presentació en grup (3-4 alum.)", weight: 20, min: 0, hint: "Exposición oral" },
+          { id: "tests", name: "Tests setmanals", weight: 15, min: 0, hint: "Seguimiento continuo" },
+          { id: "glob", name: "Prova global tipus test", weight: 15, min: 0, hint: "Test final" }
+        ],
+        evaluate(scores) {
+          return standardEval(this, scores, { capIfMinFailed: null });
+        }
+      },
+      {
+        id: "tds",
+        name: "Tractament Digital de Biosenyals (TDS)",
+        ects: 6,
+        ruleNote: "Prácticas ≥ 5 por separado Y media de parciales ≥ 5 por separado.",
+        secondConvInfo: "2ª Convocatoria: Examen escrito global con todo el temario teórico y práctico.",
+        items: [
+          { id: "lab_q", name: "Pràctiques: Preguntes al lab", weight: 5, min: 0, hint: "Forma parte del 20% de prácticas" },
+          { id: "lab_ex", name: "Pràctiques: Examen final pràctiques", weight: 15, min: 0, hint: "Media lab (5%+15%) debe ser ≥ 5" },
+          { id: "p1", name: "Examen Parcial 1", weight: 40, min: 0, hint: "Media P1+P2 debe ser ≥ 5" },
+          { id: "p2", name: "Examen Parcial 2", weight: 40, min: 0, hint: "Media P1+P2 debe ser ≥ 5" }
+        ],
+        evaluate(scores) {
+          const { lab_q, lab_ex, p1, p2 } = scores;
+          let currentPoints = 0;
+          let filledWeight = 0;
+          Object.entries(scores).forEach(([k, val]) => {
+            if (val !== null) {
+              const w = this.items.find(i => i.id === k).weight;
+              currentPoints += val * (w / 100);
+              filledWeight += w;
+            }
+          });
+
+          const failedItems = [];
+          let warnings = [];
+
+          if (lab_q !== null && lab_ex !== null) {
+            const labAvg = (lab_q * 5 + lab_ex * 15) / 20;
+            if (labAvg < 5) {
+              failedItems.push("lab_q", "lab_ex");
+              warnings.push(`Media de prácticas = ${labAvg.toFixed(2)} (< 5.0 obligatorio).`);
+            }
+          } else if (lab_q === null && lab_ex !== null) {
+            if ((50 + lab_ex * 15) / 20 < 5) {
+              failedItems.push("lab_ex");
+              warnings.push("Imposible llegar al 5.0 de media en prácticas.");
+            }
+          }
+
+          if (p1 !== null && p2 !== null) {
+            const parAvg = (p1 + p2) / 2;
+            if (parAvg < 5) {
+              failedItems.push("p1", "p2");
+              warnings.push(`Media de parciales = ${parAvg.toFixed(2)} (< 5.0 obligatorio).`);
+            }
+          }
+
+          const remainingWeight = 100 - filledWeight;
+          const maxPossible = currentPoints + (remainingWeight / 100) * 10;
+
+          if (warnings.length > 0 || maxPossible < 5) {
+            const reason = warnings.length > 0
+              ? warnings.join(" ")
+              : `Nota máxima alcanzable: ${maxPossible.toFixed(2)} (< 5.0).`;
+            return {
+              finalGrade: currentPoints,
+              status: "fail",
+              badge: "2ª Convocatoria",
+              convType: "second",
+              convBanner: `⚠️ Hay que ir a 2ª convocatoria. ${reason}`,
+              message: this.secondConvInfo,
+              failedItems
+            };
+          }
+
+          if (filledWeight < 100) {
+            let targets = [];
+            if (p1 !== null && p2 === null) {
+              const needP2 = Math.max(0, 10 - p1);
+              targets.push(`al menos ${needP2.toFixed(2)} en el Parcial 2`);
+            } else if (p1 === null && p2 !== null) {
+              const needP1 = Math.max(0, 10 - p2);
+              targets.push(`al menos ${needP1.toFixed(2)} en el Parcial 1`);
+            } else if (p1 === null && p2 === null) {
+              targets.push(`media ≥ 5.00 en Parciales`);
+            }
+
+            if (lab_q !== null && lab_ex === null) {
+              const needLabEx = Math.max(0, (100 - lab_q * 5) / 15);
+              targets.push(`al menos ${needLabEx.toFixed(2)} en Examen Pràctiques`);
+            } else if (lab_q === null && lab_ex !== null) {
+              const needLabQ = Math.max(0, (100 - lab_ex * 15) / 5);
+              targets.push(`al menos ${needLabQ.toFixed(2)} en Preguntes Lab`);
+            } else if (lab_q === null && lab_ex === null) {
+              targets.push(`media ≥ 5.00 en Pràctiques`);
+            }
+
+            return {
+              finalGrade: currentPoints,
+              status: "pending",
+              badge: "1ª Conv. viable",
+              convType: "viable",
+              convBanner: "✅ Todavía se puede aprobar en 1ª convocatoria.",
+              message: `Para aprobar necesitas sacar: ${targets.join(" y ")}.`,
+              failedItems: []
+            };
+          }
+
+          return {
+            finalGrade: currentPoints,
+            status: "pass",
+            badge: "Aprobada (1ª Conv.)",
+            convType: "passed",
+            convBanner: "🎉 ¡Asignatura aprobada en 1ª convocatoria!",
+            message: "¡Prácticas y teoría aprobadas por separado!",
+            failedItems: []
+          };
+        }
+      },
+      {
+        id: "xarxes",
+        name: "Xarxes de Dades i Internet",
+        ects: 6,
+        ruleNote: "PT ≥ 5 y PSP ≥ 5 obligatorios · 0.40·PT + 0.20·PSP + 0.20·m(QR) + 0.20·mP(QT) ≥ 5",
+        secondConvInfo: "2ª Convocatoria: Solo recuperas los exámenes o prácticas que tengas suspensos (< 5).",
+        items: [
+          { id: "pt", name: "Parcial Teoría (PT)", weight: 40, min: 5, hint: "Mín. 5 obligatorio" },
+          { id: "psp", name: "Parcial Prácticas (PSP)", weight: 20, min: 5, hint: "Mín. 5 obligatorio" },
+          { id: "qr", name: "Cuestionarios Prácticas — m(QR)", weight: 20, min: 0, hint: "Sin mínimo" },
+          { id: "qt", name: "Cuestionarios Prácticas — mP(QT)", weight: 20, min: 0, hint: "Sin mínimo" }
+        ],
+        evaluate(scores) {
+          return standardEval(this, scores, { capIfMinFailed: 4 });
+        }
+      }
+    ];
+
+    function standardEval(subject, scores, opts) {
+      let currentPoints = 0;
+      let filledWeight = 0;
+      const failedItems = [];
+      const pendingItems = [];
+
+      subject.items.forEach(item => {
+        const val = scores[item.id];
+        if (val !== null) {
+          currentPoints += val * (item.weight / 100);
+          filledWeight += item.weight;
+          if (item.min > 0 && val < item.min) {
+            failedItems.push(item.id);
+          }
+        } else {
+          pendingItems.push(item);
+        }
+      });
+
+      const allFilled = filledWeight === 100;
+      const remainingWeight = 100 - filledWeight;
+      const maxPossible = currentPoints + (remainingWeight / 100) * 10;
+
+      if (failedItems.length > 0) {
+        const failedNames = failedItems
+          .map(id => subject.items.find(i => i.id === id).name)
+          .join(", ");
+        const capped = opts.capIfMinFailed !== null ? Math.min(currentPoints, opts.capIfMinFailed) : currentPoints;
+        return {
+          finalGrade: capped,
+          status: "fail",
+          badge: "2ª Convocatoria",
+          convType: "second",
+          convBanner: `⚠️ Hay que ir a 2ª convocatoria. No llegas al mínimo en: ${failedNames}.`,
+          message: `${opts.capIfMinFailed !== null ? `Nota tope en acta: ${opts.capIfMinFailed}. ` : ""}${subject.secondConvInfo}`,
+          failedItems
+        };
+      }
+
+      if (!allFilled && maxPossible < 5) {
+        return {
+          finalGrade: currentPoints,
+          status: "fail",
+          badge: "2ª Convocatoria",
+          convType: "second",
+          convBanner: `⚠️ Hay que ir a 2ª convocatoria. Aunque saques un 10 en lo que falta, la nota máxima sería ${maxPossible.toFixed(2)}.`,
+          message: subject.secondConvInfo,
+          failedItems: []
+        };
+      }
+
+      if (!allFilled) {
+        const neededPoints = 5 - currentPoints;
+        const neededAvg = neededPoints <= 0 ? 0 : (neededPoints / remainingWeight) * 100;
+        const pendingMinItems = pendingItems.filter(i => i.min > 0);
+
+        let msg = "";
+        if (pendingItems.length === 1) {
+          const onlyItem = pendingItems[0];
+          const exactNeeded = Math.max(onlyItem.min, neededAvg);
+          msg = `Para aprobar necesitas sacar al menos un ${exactNeeded.toFixed(2)} en ${onlyItem.name}.`;
+        } else {
+          if (neededPoints <= 0) {
+            msg = "Ya tienes los 5.00 pts acumulados. ";
+          } else {
+            msg = `Para llegar al 5.00 necesitas una media de ${neededAvg.toFixed(2)} en el ${remainingWeight}% restante. `;
+          }
+          if (pendingMinItems.length > 0) {
+            const minList = pendingMinItems.map(i => `${i.name} (≥ ${i.min})`).join(", ");
+            msg += `Recuerda cumplir los mínimos en: ${minList}.`;
+          }
+        }
+
+        return {
+          finalGrade: currentPoints,
+          status: "pending",
+          badge: "1ª Conv. viable",
+          convType: "viable",
+          convBanner: "✅ Todavía se puede aprobar en 1ª convocatoria.",
+          message: msg,
+          failedItems: []
+        };
+      }
+
+      const passed = currentPoints >= 5;
+      return {
+        finalGrade: currentPoints,
+        status: passed ? "pass" : "fail",
+        badge: passed ? "Aprobada (1ª Conv.)" : "2ª Convocatoria",
+        convType: passed ? "passed" : "second",
+        convBanner: passed
+          ? "🎉 ¡Asignatura aprobada en 1ª convocatoria!"
+          : "⚠️ Hay que ir a 2ª convocatoria (media ponderada < 5.0).",
+        message: passed
+          ? (currentPoints >= 9 ? "¡Excelente! Candidata a Matrícula de Honor." : "Asignatura superada.")
+          : subject.secondConvInfo,
+        failedItems: []
+      };
+    }
+
+    const STORAGE_KEY = "urv_geb_grades_2026_27_v3";
+    let savedGrades = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    let syncTimer = null;
+
+    function setSyncBadge(text, isCloud = false) {
+      const el = document.getElementById("sync-badge");
+      el.textContent = text;
+      el.style.background = isCloud ? "var(--green-soft)" : "var(--primary-soft)";
+      el.style.color = isCloud ? "#065f46" : "var(--primary)";
+    }
+
+    async function loadFromCloud() {
+      if (!sbClient) return;
+      setSyncBadge("Sincronizando con la nube...", true);
+      const { data, error } = await sbClient
+        .from("notas_urv")
+        .select("datos")
+        .eq("id", ROW_ID)
+        .single();
+
+      if (!error && data && data.datos) {
+        if (Object.keys(data.datos).length > 0) {
+          savedGrades = data.datos;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedGrades));
+        } else if (Object.keys(savedGrades).length > 0) {
+          await pushToCloud();
+        }
+        setSyncBadge("☁️ Sincronizado en la nube (PC / iPad / Móvil)", true);
+        renderAll();
+      } else {
+        setSyncBadge("⚠️ Error de conexión con Supabase (usando copia local)", false);
+      }
+    }
+
+    async function pushToCloud() {
+      if (!sbClient) return;
+      setSyncBadge("Guardando en la nube...", true);
+      const { error } = await sbClient
+        .from("notas_urv")
+        .upsert({ id: ROW_ID, datos: savedGrades, updated_at: new Date().toISOString() });
+      if (!error) {
+        setSyncBadge("☁️ Guardado y sincronizado en todos tus dispositivos", true);
+      }
+    }
+
+    function saveGrades() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedGrades));
+      if (sbClient) {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(pushToCloud, 600);
+      }
+    }
+
+    function exportBackup() {
+      const code = btoa(JSON.stringify(savedGrades));
+      navigator.clipboard.writeText(code).then(() => {
+        alert("¡Código de notas copiado! Pégalo en tu móvil pulsando 'Pegar notas'.");
+      }).catch(() => {
+        prompt("Copia este código y pégalo en tu móvil:", code);
+      });
+    }
+
+    function importBackup() {
+      const code = prompt("Pega aquí el código de notas copiado desde tu otro dispositivo:");
+      if (!code) return;
+      try {
+        const parsed = JSON.parse(atob(code.trim()));
+        savedGrades = parsed;
+        saveGrades();
+        renderAll();
+        alert("¡Notas cargadas correctamente!");
+      } catch (e) {
+        alert("El código pegado no es válido.");
+      }
+    }
+
+    function onGradeInput(subjectId, itemId, value) {
+      if (!savedGrades[subjectId]) savedGrades[subjectId] = {};
+      if (value === "" || value === null) {
+        delete savedGrades[subjectId][itemId];
+      } else {
+        let num = parseFloat(value);
+        if (isNaN(num)) return;
+        if (num < 0) num = 0;
+        if (num > 10) num = 10;
+        savedGrades[subjectId][itemId] = num;
+      }
+      saveGrades();
+      updateSubjectCard(subjectId);
+      updateGlobalSummary();
+    }
+
+    function resetAll() {
+      if (!confirm("¿Seguro que quieres borrar todas las notas introducidas?")) return;
+      savedGrades = {};
+      saveGrades();
+      renderAll();
+    }
+
+    function getScoresForSubject(subject) {
+      const subData = savedGrades[subject.id] || {};
+      const scores = {};
+      subject.items.forEach(item => {
+        scores[item.id] = subData[item.id] !== undefined ? subData[item.id] : null;
+      });
+      return scores;
+    }
+
+    function updateSubjectCard(subjectId) {
+      const subject = SUBJECTS.find(s => s.id === subjectId);
+      const scores = getScoresForSubject(subject);
+      const res = subject.evaluate(scores);
+
+      const cardEl = document.getElementById(`card-${subject.id}`);
+      cardEl.classList.remove("card-second-conv", "card-passed");
+      if (res.convType === "second") cardEl.classList.add("card-second-conv");
+      if (res.convType === "passed") cardEl.classList.add("card-passed");
+
+      const badgeEl = document.getElementById(`badge-${subject.id}`);
+      badgeEl.textContent = res.badge;
+      badgeEl.className = `badge badge-${res.status}`;
+
+      const scoreEl = document.getElementById(`score-${subject.id}`);
+      scoreEl.textContent = res.finalGrade !== null ? res.finalGrade.toFixed(2) : "—";
+      scoreEl.style.color =
+        res.status === "pass" ? "var(--green)" :
+        res.status === "fail" ? "var(--red)" : "var(--text)";
+
+      const bannerEl = document.getElementById(`banner-${subject.id}`);
+      bannerEl.textContent = res.convBanner;
+      bannerEl.className = `conv-banner ${res.convType}`;
+
+      const msgEl = document.getElementById(`msg-${subject.id}`);
+      msgEl.textContent = res.message;
+
+      subject.items.forEach(item => {
+        const row = document.getElementById(`row-${subject.id}-${item.id}`);
+        if (res.failedItems.includes(item.id)) {
+          row.classList.add("error-min");
+        } else {
+          row.classList.remove("error-min");
+        }
+      });
+    }
+
+    function updateGlobalSummary() {
+      let totalEctsEvaluated = 0;
+      let weightedSum = 0;
+      let passedCount = 0;
+      let secondCount = 0;
+
+      SUBJECTS.forEach(sub => {
+        const scores = getScoresForSubject(sub);
+        const hasAny = Object.values(scores).some(v => v !== null);
+        const res = sub.evaluate(scores);
+        if (res.status === "pass") passedCount++;
+        if (res.convType === "second") secondCount++;
+        if (hasAny && res.finalGrade !== null) {
+          weightedSum += res.finalGrade * sub.ects;
+          totalEctsEvaluated += sub.ects;
+        }
+      });
+
+      document.getElementById("passed-count").textContent = `${passedCount} / ${SUBJECTS.length}`;
+      document.getElementById("second-count").textContent = `${secondCount}`;
+      document.getElementById("global-avg").textContent =
+        totalEctsEvaluated > 0 ? (weightedSum / totalEctsEvaluated).toFixed(2) : "—";
+    }
+
+    function renderAll() {
+      const grid = document.getElementById("subjects-grid");
+      grid.innerHTML = "";
+
+      SUBJECTS.forEach(sub => {
+        const subData = savedGrades[sub.id] || {};
+        const card = document.createElement("div");
+        card.className = "card";
+        card.id = `card-${sub.id}`;
+
+        const itemsHtml = sub.items.map(item => {
+          const val = subData[item.id] !== undefined ? subData[item.id] : "";
+          return `
+            <div class="item-row" id="row-${sub.id}-${item.id}">
+              <div>
+                <div class="item-name">${item.name}</div>
+                <div class="item-sub">${item.hint}</div>
+              </div>
+              <span class="weight-tag">${item.weight}%</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                placeholder="0–10"
+                value="${val}"
+                oninput="onGradeInput('${sub.id}', '${item.id}', this.value)"
+              />
+            </div>
+          `;
+        }).join("");
+
+        card.innerHTML = `
+          <div>
+            <div class="card-header">
+              <div>
+                <div class="card-title">${sub.name}</div>
+                <div class="card-meta">${sub.ects} ECTS · ${sub.ruleNote}</div>
+              </div>
+              <span class="badge badge-pending" id="badge-${sub.id}">1ª Conv. viable</span>
+            </div>
+            <div class="items-list">
+              ${itemsHtml}
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="grade-line">
+              <span>Nota actual / acumulada:</span>
+              <span class="final-score" id="score-${sub.id}">0.00</span>
+            </div>
+            <div class="conv-banner viable" id="banner-${sub.id}"></div>
+            <div class="helper-text" id="msg-${sub.id}"></div>
+          </div>
+        `;
+
+        grid.appendChild(card);
+        updateSubjectCard(sub.id);
+      });
+
+      updateGlobalSummary();
+    }
+
+    renderAll();
+    loadFromCloud();
+  </script>
+</body>
+</html>
